@@ -61,7 +61,8 @@ class NCCLInitOp : public framework::OperatorBase {
 class NCCLInitOpVarTypeInference : public framework::VarTypeInference {
  public:
   void operator()(framework::InferVarTypeContext *ctx) const override {
-    ctx->SetOutputType("Communicator", framework::proto::VarType::RAW);
+    auto out_var_name = ctx->Output("Communicator").front();
+    ctx->SetType(out_var_name, framework::proto::VarType::RAW);
   }
 };
 

@@ -119,10 +119,9 @@ class ElementwiseOp : public framework::OperatorWithKernel {
 class ElementwiseOpInferVarType
     : public framework::PassInDtypeAndVarTypeToOutput {
  protected:
-  std::unordered_map<std::string, std::string> &GetInputOutputWithSameType()
+  std::unordered_map<std::string, std::string> GetInputOutputWithSameType()
       const override {
-    static std::unordered_map<std::string, std::string> m{{"X", /*->*/ "Out"}};
-    return m;
+    return std::unordered_map<std::string, std::string>{{"X", /*->*/ "Out"}};
   }
 };
 

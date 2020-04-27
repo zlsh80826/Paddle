@@ -85,8 +85,9 @@ to a file on disk.
 class SaveCombineOpInferVarType : public framework::VarTypeInference {
  public:
   void operator()(framework::InferVarTypeContext* ctx) const override {
-    ctx->SetOutputType("Y", framework::proto::VarType::RAW,
-                       framework::ALL_ELEMENTS);
+    for (auto& o : ctx->Output("Y")) {
+      ctx->SetType(o, framework::proto::VarType::RAW);
+    }
   }
 };
 

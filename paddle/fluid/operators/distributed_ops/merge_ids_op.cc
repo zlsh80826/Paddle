@@ -115,8 +115,10 @@ class MergeIdsOp : public framework::OperatorWithKernel {
 class MergeIdsOpInferVarType : public framework::VarTypeInference {
  public:
   void operator()(framework::InferVarTypeContext *ctx) const override {
-    auto input_type = ctx->GetInputType("Ids");
-    ctx->SetOutputType("Out", input_type, framework::ALL_ELEMENTS);
+    auto input_type = ctx->GetType(ctx->Input("Ids")[0]);
+    for (auto &out_var : ctx->Output("Out")) {
+      ctx->SetType(out_var, input_type);
+    }
   }
 };
 
