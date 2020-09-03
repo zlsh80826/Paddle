@@ -70,9 +70,7 @@ class ConvertMaskPluginDynamic : public DynamicPluginTensorRT {
   size_t getWorkspaceSize(const nvinfer1::PluginTensorDesc* inputs,
                           int nb_inputs,
                           const nvinfer1::PluginTensorDesc* outputs,
-                          int nb_outputs) const override {
-    return 0;
-  }
+                          int nb_outputs) const override;
 
   int enqueue(const nvinfer1::PluginTensorDesc* input_desc,
               const nvinfer1::PluginTensorDesc* output_desc,

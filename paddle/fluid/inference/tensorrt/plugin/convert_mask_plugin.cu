@@ -96,6 +96,19 @@ nvinfer1::DimsExprs ConvertMaskPluginDynamic::getOutputDimensions(
   return ret;
 }
 
+size_t ConvertMaskPluginDynamic::getWorkspaceSize(const nvinfer1::PluginTensorDesc* inputs,
+                          int nb_inputs,
+                          const nvinfer1::PluginTensorDesc* outputs,
+                          int nb_outputs) const {
+  if (type_ == nvinfer1::DataType::kFLOAT) {
+    return 0;
+  }
+  auto input_dims = inputs->dims;
+  int batch = input_dims.d[0];
+  int seq_len = input_dims.d[1];
+  return batch * seq_len * sizeof(half);
+}
+
 bool ConvertMaskPluginDynamic::supportsFormatCombination(
     int pos, const nvinfer1::PluginTensorDesc* in_out, int nb_inputs,
     int nb_outputs) {
@@ -224,15 +237,12 @@ int ConvertMaskPluginDynamic::enqueue(
   int batch = input_dims.d[0];
   int seq_len = input_dims.d[1];
 
-  // assert(seq_len == 64 || seq_len == 96 || seq_len == 128 || seq_len == 384);
-
   if (type_ == nvinfer1::DataType::kFLOAT) {
     IMaskPreprocess<<<batch, seq_len, 0, stream>>>(
         static_cast<const float*>(inputs[0]), static_cast<int*>(outputs[0]),
         seq_len, batch);
   } else {
-    int* inputMaskSB;
-    cudaMalloc(&inputMaskSB, batch * seq_len * sizeof(int));
+    int* inputMaskSB = static_cast<int*>(workspace);
     if (input_desc[0].type == nvinfer1::DataType::kFLOAT) {
       FullMaskPreprocess<float><<<batch, seq_len, 0, stream>>>(
           static_cast<const float*>(inputs[0]), inputMaskSB, seq_len, batch);
@@ -250,18 +260,8 @@ int ConvertMaskPluginDynamic::enqueue(
     } else {
       assert(false);
     }
-    /*
-        int* buf_h = (int*)malloc(batch * seq_len * sizeof(int));
-        cudaMemcpy(buf_h, inputMaskSB, batch * seq_len * sizeof(int),
-       cudaMemcpyDeviceToHost);
-        for (int i = 0; i < batch*seq_len; ++ i) {
-            std::cerr << buf_h[i] << " ";
-        }
-        std::cerr << std::endl;
-    */
     convertMask(seq_len, batch, warps_m, warps_n, warps_k, inputMaskSB,
                 static_cast<uint32_t*>(outputs[0]), stream);
-    cudaFree(inputMaskSB);
   }
 
   return cudaGetLastError() != cudaSuccess;
