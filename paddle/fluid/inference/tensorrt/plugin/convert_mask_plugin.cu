@@ -96,6 +96,12 @@ nvinfer1::DimsExprs ConvertMaskPluginDynamic::getOutputDimensions(
   return ret;
 }
 
+size_t ConvertMaskPluginDynamic::getWorkspaceSize(
+    const nvinfer1::PluginTensorDesc* inputs, int nb_inputs,
+    const nvinfer1::PluginTensorDesc* outputs, int nb_outputs) const {
+  return inputs[0].dims.d[0] * inputs[0].dims.d[1];
+}
+
 bool ConvertMaskPluginDynamic::supportsFormatCombination(
     int pos, const nvinfer1::PluginTensorDesc* in_out, int nb_inputs,
     int nb_outputs) {
@@ -106,9 +112,9 @@ bool ConvertMaskPluginDynamic::supportsFormatCombination(
   assert(nb_outputs == 1);
 
   if (pos == 0) {
-    return ((desc.type == nvinfer1::DataType::kFLOAT ||
-             desc.type == nvinfer1::DataType::kHALF) &&
-            desc.dims.nbDims == 3);
+    if (type_ == nvinfer1::DataType::kHALF)
+      return desc.type == nvinfer1::DataType::kHALF && desc.dims.nbDims == 3;
+    return desc.type == nvinfer1::DataType::kFLOAT && desc.dims.nbDims == 3;
   }
   // return true;
   /* fp16 -> fp16, fp32 -> int32 */
@@ -224,22 +230,14 @@ int ConvertMaskPluginDynamic::enqueue(
   int batch = input_dims.d[0];
   int seq_len = input_dims.d[1];
 
-  // assert(seq_len == 64 || seq_len == 96 || seq_len == 128 || seq_len == 384);
-
   if (type_ == nvinfer1::DataType::kFLOAT) {
     IMaskPreprocess<<<batch, seq_len, 0, stream>>>(
         static_cast<const float*>(inputs[0]), static_cast<int*>(outputs[0]),
         seq_len, batch);
   } else {
-    int* inputMaskSB;
-    cudaMalloc(&inputMaskSB, batch * seq_len * sizeof(int));
-    if (input_desc[0].type == nvinfer1::DataType::kFLOAT) {
-      FullMaskPreprocess<float><<<batch, seq_len, 0, stream>>>(
-          static_cast<const float*>(inputs[0]), inputMaskSB, seq_len, batch);
-    } else {
-      FullMaskPreprocess<half><<<batch, seq_len, 0, stream>>>(
-          static_cast<const half*>(inputs[0]), inputMaskSB, seq_len, batch);
-    }
+    int* inputMaskSB = reinterpret_cast<int*>(workspace);
+    FullMaskPreprocess<half><<<batch, seq_len, 0, stream>>>(
+        static_cast<const half*>(inputs[0]), inputMaskSB, seq_len, batch);
     size_t warps_m = 0, warps_n = 0, warps_k = 1;
     if (seq_len == 64 || seq_len == 96 || seq_len == 128) {
       warps_m = 2;
@@ -250,18 +248,8 @@ int ConvertMaskPluginDynamic::enqueue(
     } else {
       assert(false);
     }
-    /*
-        int* buf_h = (int*)malloc(batch * seq_len * sizeof(int));
-        cudaMemcpy(buf_h, inputMaskSB, batch * seq_len * sizeof(int),
-       cudaMemcpyDeviceToHost);
-        for (int i = 0; i < batch*seq_len; ++ i) {
-            std::cerr << buf_h[i] << " ";
-        }
-        std::cerr << std::endl;
-    */
     convertMask(seq_len, batch, warps_m, warps_n, warps_k, inputMaskSB,
                 static_cast<uint32_t*>(outputs[0]), stream);
-    cudaFree(inputMaskSB);
   }
 
   return cudaGetLastError() != cudaSuccess;
