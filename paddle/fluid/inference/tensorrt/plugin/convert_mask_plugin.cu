@@ -148,14 +148,15 @@ __global__ void FullMaskPreprocess(const T* input, int* output, int seq_len,
 /* float [B, S, 1] -> int [B] */
 /* [[1. 1. 1. 0. 0.], -> [3, 4]
     [1. 1. 1. 1. 0.]]           */
-__global__ void IMaskPreprocess(const float* input, int* output, int seq_len,
+template <typename T>
+__global__ void IMaskPreprocess(const T* input, int* output, int seq_len,
                                 int batch) {
-  float sum = 0.f;
+  T sum = T(0.f);
   int bid = blockIdx.x;
   int sid = threadIdx.x;
   float thread_data = input[bid * seq_len + sid];
 
-  sum = paddle::operators::math::blockReduceSum<float>(thread_data, 0xffffffff);
+  sum = paddle::operators::math::blockReduceSum<T>(thread_data, 0xffffffff);
 
   if (sid == 0) {
     output[bid] = static_cast<int>(sum);
@@ -231,10 +232,16 @@ int ConvertMaskPluginDynamic::enqueue(
   int seq_len = input_dims.d[1];
 
   if (type_ == nvinfer1::DataType::kFLOAT) {
-    IMaskPreprocess<<<batch, seq_len, 0, stream>>>(
+    IMaskPreprocess<float><<<batch, seq_len, 0, stream>>>(
         static_cast<const float*>(inputs[0]), static_cast<int*>(outputs[0]),
         seq_len, batch);
   } else {
+    if (seq_len != 64 && seq_len != 96 && seq_len != 128 && seq_len != 384) {
+      IMaskPreprocess<half><<<batch, seq_len, 0, stream>>>(
+          static_cast<const half*>(inputs[0]), static_cast<int*>(outputs[0]),
+          seq_len, batch);
+      return cudaGetLastError() != cudaSuccess;
+    }
     int* inputMaskSB = reinterpret_cast<int*>(workspace);
     FullMaskPreprocess<half><<<batch, seq_len, 0, stream>>>(
         static_cast<const half*>(inputs[0]), inputMaskSB, seq_len, batch);
