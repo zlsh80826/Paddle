@@ -88,7 +88,20 @@ class TensorRTEngineOp : public framework::OperatorBase {
                    const framework::VariableNameMap &outputs,
                    const framework::AttributeMap &attrs)
       : framework::OperatorBase(type, inputs, outputs, attrs) {
-    input_names_ = Inputs("Xs");
+    auto params = Attr<std::vector<std::string>>("parameters");
+    for (const auto &param : params) {
+      param_names_.insert(param);
+    }
+
+    auto xs = Inputs("Xs");
+    for (const auto &x : xs) {
+      if (param_names_.count(x)) continue;
+      input_names_.emplace_back(x);
+    }
+
+    PADDLE_ENFORCE_EQ(input_names_.empty(), false,
+                      "should pass at least one input");
+
     max_batch_size_ = Attr<int>("max_batch_size");
     workspace_size_ = Attr<int>("workspace_size");
     device_id_ = Attr<int>("gpu_id");
@@ -99,10 +112,6 @@ class TensorRTEngineOp : public framework::OperatorBase {
     engine_key_ = Attr<std::string>("engine_key");
     predictor_id_ = Attr<int>("predictor_id");
 
-    auto params = Attr<std::vector<std::string>>("parameters");
-    for (const auto &param : params) {
-      param_names_.insert(param);
-    }
     // calibration_mode is ture represents we need to
     // generate the calibration table data.
     calibration_mode_ =
@@ -204,35 +213,61 @@ class TensorRTEngineOp : public framework::OperatorBase {
               TensorRTEngine *engine) const {
     int runtime_batch = 1;
     platform::DeviceContextPool &pool = platform::DeviceContextPool::Instance();
-    auto &dev_ctx = *pool.Get(dev_place);
-    auto stream =
+    const auto &dev_ctx = *pool.Get(dev_place);
+    const auto stream =
         reinterpret_cast<const platform::CUDADeviceContext &>(dev_ctx).stream();
 
-    PADDLE_ENFORCE_EQ(input_names_.empty(), false,
-                      "should pass at least one input");
-
-    std::vector<std::string> output_maps =
+    const std::vector<std::string> &output_maps =
         Attr<std::vector<std::string>>("output_name_mapping");
 
-    int num_inputs = 0;
-
-    for (const auto &x : Inputs("Xs")) {
-      if (param_names_.count(x)) continue;
-      num_inputs += 1;
-    }
-    const int num_bindings = num_inputs + Outputs("Ys").size();
-    // std::cerr << "num bindings: " << num_bindings << std::endl;
+    // const int num_inputs = input_names_.size();
+    // const int num_bindings = num_inputs + Outputs("Ys").size();
+    const int32_t num_bindings = engine->engine()->getNbBindings();
     std::vector<void *> buffers(num_bindings);
+    auto *trt_context = engine->context();
 
     // Bind input tensor to TRT.
-    for (const auto &x : Inputs("Xs")) {
-      if (param_names_.count(x)) continue;
+    for (const auto &x : input_names_) {
       // convert input and copy to TRT engine's buffer
       auto &t =
           inference::analysis::GetFromScope<framework::LoDTensor>(scope, x);
-      auto t_shape = framework::vectorize<int64_t>(t.dims());
+      const auto t_shape = framework::vectorize<int64_t>(t.dims());
       runtime_batch = t_shape[0];
-      const int bind_index = engine->engine()->getBindingIndex(x.c_str());
+      /*
+            std::cerr << x << ": ";
+            for (size_t i = 0; i < t_shape.size(); ++ i) {
+              std::cerr << t_shape[i] << " ";
+            }
+            std::cerr << std::endl;
+      */
+      /* if (t_shape[1] < 64) {
+        trt_context->setOptimizationProfile(0);
+        std::cerr << "set optimization profile to " << 0 << std::endl;
+      } else */ if (t_shape[1] == 64) {
+        trt_context->setOptimizationProfile(0);
+        std::cerr << "set optimization profile to " << 0 << std::endl;
+      } else if (t_shape[1] == 96) {
+        trt_context->setOptimizationProfile(1);
+        std::cerr << "set optimization profile to " << 1 << std::endl;
+      } else if (t_shape[1] == 128) {
+        trt_context->setOptimizationProfile(2);
+        std::cerr << "set optimization profile to " << 2 << std::endl;
+      } else if (t_shape[1] < 64) {
+        trt_context->setOptimizationProfile(3);
+        std::cerr << "set optimization profile to " << 3 << std::endl;
+      } else {
+        assert(false);
+      }
+      std::string tmpx;
+      if (trt_context->getOptimizationProfile() > 0)
+        tmpx = x + " [profile " +
+               std::to_string(trt_context->getOptimizationProfile()) + "]";
+      else
+        tmpx = x;
+
+      const int bind_index = engine->engine()->getBindingIndex(tmpx.c_str());
+      std::cerr << "get bind_index: " << bind_index << std::endl;
+      /*
       PADDLE_ENFORCE_LT(
           bind_index, num_bindings,
           platform::errors::InvalidArgument(
@@ -241,6 +276,9 @@ class TensorRTEngineOp : public framework::OperatorBase {
               "the number of inputs and outputs. Received binding "
               "index=%d >= total inputs and outputs=%d",
               bind_index, num_bindings));
+      std::cerr << "engine dynamic: " << engine->with_dynamic_shape() <<
+      std::endl;
+      */
       if (!engine->with_dynamic_shape()) {
         // check if the input shapes are consistent with model.
         if (HasAttr(x + "_shape")) {
@@ -254,9 +292,10 @@ class TensorRTEngineOp : public framework::OperatorBase {
         }
       } else {
 #if IS_TRT_VERSION_GE(6000)
-        auto *trt_context = engine->context();
+        std::cerr << "setting binding dimensions" << std::endl;
         trt_context->setBindingDimensions(
             bind_index, inference::tensorrt::Vec2TRT_Dims(t_shape, x, true));
+        std::cerr << "setting binding dimensions done" << std::endl;
 #endif
       }
       auto type = t.type();
@@ -274,8 +313,14 @@ class TensorRTEngineOp : public framework::OperatorBase {
     int output_index = 0;
     VLOG(4) << "TensorRT Engine Op Outputs:";
     for (const auto &y : Outputs("Ys")) {
-      const int bind_index =
-          engine->engine()->getBindingIndex(output_maps[output_index].c_str());
+      std::string tmpy;
+      if (trt_context->getOptimizationProfile() > 0)
+        tmpy = output_maps[output_index] + " [profile " +
+               std::to_string(trt_context->getOptimizationProfile()) + "]";
+      else
+        tmpy = output_maps[output_index];
+
+      const int bind_index = engine->engine()->getBindingIndex(tmpy.c_str());
       std::vector<int> ddim;
 
       if (!engine->with_dynamic_shape()) {
@@ -286,7 +331,7 @@ class TensorRTEngineOp : public framework::OperatorBase {
         }
       } else {
 #if IS_TRT_VERSION_GE(6000)
-        auto *trt_context = engine->context();
+        // auto *trt_context = engine->context();
         auto dims = trt_context->getBindingDimensions(bind_index);
         int nb_dims = dims.nbDims;
         for (; nb_dims > 0; nb_dims--) {

@@ -58,7 +58,8 @@ TRT_DT FluidDataType2TRT(FluidDT type) {
 
 // The T can be int32 or int64 type.
 template <typename T>
-nvinfer1::Dims Vec2TRT_Dims(const std::vector<T>& shape, std::string input,
+nvinfer1::Dims Vec2TRT_Dims(const std::vector<T>& shape,
+                            const std::string& input,
                             bool with_dynamic_shape = false) {
   PADDLE_ENFORCE_GT(shape.size(), 1UL,
                     platform::errors::InvalidArgument(
