@@ -46,9 +46,8 @@ class SliceOpConverter : public OpConverter {
       std::vector<nvinfer1::ITensor*> plugin_inputs;
       plugin_inputs.emplace_back(trans_layer->getOutput(0));
 
-      bool ban_fp16 = engine_->disable_trt_plugin_fp16();
       plugin::SlicePluginDynamic* plugin =
-          new plugin::SlicePluginDynamic(starts, ends, axes, ban_fp16);
+          new plugin::SlicePluginDynamic(starts, ends, axes);
       layer = engine_->AddPluginV2(plugin_inputs.data(), plugin_inputs.size(),
                                    plugin);
     } else {

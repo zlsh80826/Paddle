@@ -56,11 +56,52 @@ __global__ void SliceKernel(int num, int dims, const T *input,
   }
 }
 
+SlicePluginDynamic::SlicePluginDynamic(std::vector<int> starts,
+                                       std::vector<int> ends,
+                                       std::vector<int> axes)
+    : starts_(starts), ends_(ends), axes_(axes) {}
+
+SlicePluginDynamic::SlicePluginDynamic(void const *serial_data,
+                                       size_t serial_length) {
+  DeserializeValue(&serial_data, &serial_length, &starts_);
+  DeserializeValue(&serial_data, &serial_length, &ends_);
+  DeserializeValue(&serial_data, &serial_length, &axes_);
+}
+
+nvinfer1::IPluginV2DynamicExt *SlicePluginDynamic::clone() const {
+  return new SlicePluginDynamic(starts_, ends_, axes_);
+}
+
+int SlicePluginDynamic::getNbOutputs() const { return 1; }
 int SlicePluginDynamic::initialize() { return 0; }
+void SlicePluginDynamic::terminate() {}
 
-size_t SlicePluginDynamic::getSerializationSize() const { return 0; }
+void SlicePluginDynamic::configurePlugin(
+    const nvinfer1::DynamicPluginTensorDesc *in, int nbInputs,
+    const nvinfer1::DynamicPluginTensorDesc *out, int nbOutputs) {}
 
-void SlicePluginDynamic::serialize(void *buffer) const {}
+size_t SlicePluginDynamic::getWorkspaceSize(
+    const nvinfer1::PluginTensorDesc *inputs, int nbInputs,
+    const nvinfer1::PluginTensorDesc *outputs, int nbOutputs) const {
+  return 0;
+}
+void SlicePluginDynamic::destroy() { delete this; }
+
+const char *SlicePluginDynamic::getPluginType() const { return "slice_plugin"; }
+
+size_t SlicePluginDynamic::getSerializationSize() const {
+  size_t serialize_size = 0;
+  serialize_size += SerializedSize(starts_);
+  serialize_size += SerializedSize(ends_);
+  serialize_size += SerializedSize(axes_);
+  return serialize_size;
+}
+
+void SlicePluginDynamic::serialize(void *buffer) const {
+  SerializeValue(&buffer, starts_);
+  SerializeValue(&buffer, ends_);
+  SerializeValue(&buffer, axes_);
+}
 
 nvinfer1::DimsExprs SlicePluginDynamic::getOutputDimensions(
     int output_index, const nvinfer1::DimsExprs *inputs, int nb_inputs,
@@ -92,14 +133,9 @@ bool SlicePluginDynamic::supportsFormatCombination(
   const nvinfer1::PluginTensorDesc &in = in_out[pos];
   if (pos == 0) {
 #ifdef SUPPORTS_CUDA_FP16
-    if (ban_fp16_) {
-      return (in.type == nvinfer1::DataType::kFLOAT) &&
-             (in.format == nvinfer1::TensorFormat::kLINEAR);
-    } else {
-      return (in.type == nvinfer1::DataType::kFLOAT ||
-              in.type == nvinfer1::DataType::kHALF) &&
-             (in.format == nvinfer1::TensorFormat::kLINEAR);
-    }
+    return (in.type == nvinfer1::DataType::kFLOAT ||
+            in.type == nvinfer1::DataType::kHALF) &&
+           (in.format == nvinfer1::TensorFormat::kLINEAR);
 #else
     return (in.type == nvinfer1::DataType::kFLOAT) &&
            (in.format == nvinfer1::TensorFormat::kLINEAR);
@@ -195,6 +231,63 @@ int SlicePluginDynamic::enqueue(const nvinfer1::PluginTensorDesc *input_desc,
   }
   return cudaGetLastError() != cudaSuccess;
 }
+
+SlicePluginDynamicCreator::SlicePluginDynamicCreator() {}
+
+const char *SlicePluginDynamicCreator::getPluginName() const {
+  return "slice_plugin";
+}
+
+const char *SlicePluginDynamicCreator::getPluginVersion() const { return "1"; }
+
+const nvinfer1::PluginFieldCollection *
+SlicePluginDynamicCreator::getFieldNames() {
+  return &field_collection_;
+}
+
+nvinfer1::IPluginV2 *SlicePluginDynamicCreator::createPlugin(
+    const char *name, const nvinfer1::PluginFieldCollection *fc) {
+  std::vector<int> starts;
+  std::vector<int> ends;
+  std::vector<int> axes;
+
+  for (int i = 0; i < fc->nbFields; ++i) {
+    const std::string name(fc->fields[i].name);
+    if (name == "starts") {
+      const int *data = static_cast<const int *>(fc->fields[i].data);
+      const int32_t length = fc->fields[i].length;
+      starts.assign(data, data + length);
+    } else if (name == "ends") {
+      const int *data = static_cast<const int *>(fc->fields[i].data);
+      const int32_t length = fc->fields[i].length;
+      ends.assign(data, data + length);
+    } else if (name == "axes") {
+      const int *data = static_cast<const int *>(fc->fields[i].data);
+      const int32_t length = fc->fields[i].length;
+      axes.assign(data, data + length);
+    } else {
+      PADDLE_THROW(platform::errors::Fatal("Meet an unknown plugin field '" +
+                                           name +
+                                           "' when creating slice op plugin."));
+    }
+  }
+  return new SlicePluginDynamic(starts, ends, axes);
+}
+
+nvinfer1::IPluginV2 *SlicePluginDynamicCreator::deserializePlugin(
+    const char *name, const void *serial_data, size_t serial_length) {
+  auto plugin = new SlicePluginDynamic(serial_data, serial_length);
+  return plugin;
+}
+
+void SlicePluginDynamicCreator::setPluginNamespace(const char *lib_namespace) {
+  plugin_namespace_ = lib_namespace;
+}
+
+const char *SlicePluginDynamicCreator::getPluginNamespace() const {
+  return plugin_namespace_.c_str();
+}
+
 #endif
 
 }  // namespace plugin
