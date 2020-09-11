@@ -190,7 +190,6 @@ void TensorRTEngine::FreezeNetwork() {
                                             input.first, true));
       }
       infer_builder_config_->addOptimizationProfile(profile);
-      std::cerr << "set optimization profile [" << i << "] success.\n";
     }
 
     infer_builder_config_->setMaxWorkspaceSize(max_workspace_);
