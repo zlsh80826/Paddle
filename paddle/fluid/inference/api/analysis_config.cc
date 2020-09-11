@@ -264,10 +264,20 @@ void AnalysisConfig::SetTRTDynamicShapeInfo(
     std::map<std::string, std::vector<int>> max_input_shape,
     std::map<std::string, std::vector<int>> optim_input_shape,
     bool disable_trt_plugin_fp16) {
-  min_input_shape_ = min_input_shape;
-  max_input_shape_ = max_input_shape;
-  optim_input_shape_ = optim_input_shape;
+  min_input_shape_.emplace_back(min_input_shape);
+  max_input_shape_.emplace_back(max_input_shape);
+  optim_input_shape_.emplace_back(optim_input_shape);
   disable_trt_plugin_fp16_ = disable_trt_plugin_fp16;
+}
+
+int AnalysisConfig::AddTRTDynamicShapeInfo(
+    const std::map<std::string, std::vector<int>> &min_input_shape,
+    const std::map<std::string, std::vector<int>> &max_input_shape,
+    const std::map<std::string, std::vector<int>> &optim_input_shape) {
+  min_input_shape_.emplace_back(min_input_shape);
+  max_input_shape_.emplace_back(max_input_shape);
+  optim_input_shape_.emplace_back(optim_input_shape);
+  return min_input_shape_.size() - 1;
 }
 
 // TODO(Superjomn) refactor this, buggy.

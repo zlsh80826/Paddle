@@ -155,24 +155,30 @@ class OpConverter {
       auto var_shape = var->GetShape();
       if (engine->with_dynamic_shape()) {
 #if IS_TRT_VERSION_GE(6000)
-        auto min_input_shape = engine->min_input_shape()[input];
-        auto max_input_shape = engine->max_input_shape()[input];
-        auto optim_input_shape = engine->optim_input_shape()[input];
-        size_t ranks = min_input_shape.size();
+        auto min_input_shape = engine->min_input_shape().front()[input];
+        auto max_input_shape = engine->max_input_shape().front()[input];
+        auto optim_input_shape = engine->optim_input_shape().front()[input];
+        // size_t ranks = min_input_shape.size();
         std::vector<int64_t> input_shape;
-        input_shape.push_back(-1);
-        for (size_t i = 1; i < ranks; i++) {
-          if (min_input_shape[i] != max_input_shape[i]) {
-            input_shape.push_back(-1);
-          } else {
-            input_shape.push_back(min_input_shape[i]);
-            // the i dimension should be same.
-            PADDLE_ENFORCE_EQ(min_input_shape[i], optim_input_shape[i],
-                              platform::errors::InvalidArgument(
-                                  "The dim (%d) of the min_input_shape and "
-                                  "optim_input_shape should be same."));
-          }
+        for (size_t i = 0; i < min_input_shape.size(); ++i) {
+          input_shape.emplace_back(-1);
         }
+        /*
+                input_shape.push_back(-1);
+                for (size_t i = 1; i < ranks; i++) {
+                  if (min_input_shape[i] != max_input_shape[i]) {
+                    input_shape.push_back(-1);
+                  } else {
+                    input_shape.push_back(min_input_shape[i]);
+                    // the i dimension should be same.
+                    PADDLE_ENFORCE_EQ(min_input_shape[i], optim_input_shape[i],
+                                      platform::errors::InvalidArgument(
+                                          "The dim (%d) of the min_input_shape
+           and "
+                                          "optim_input_shape should be same."));
+                  }
+                }
+        */
         engine->DeclareInput(
             input, FluidDataType2TRT(
                        var->Proto()->type().lod_tensor().tensor().data_type()),

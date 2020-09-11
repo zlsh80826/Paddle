@@ -103,7 +103,7 @@ class TRTInt8Calibrator;
  */
 class TensorRTEngine {
   using DescType = ::paddle::framework::proto::BlockDesc;
-  using ShapeMapType = std::map<std::string, std::vector<int>>;
+  using ShapeMapType = std::vector<std::map<std::string, std::vector<int>>>;
 
  public:
   // Weight is model parameter.
@@ -142,7 +142,7 @@ class TensorRTEngine {
         optim_input_shape_(optim_input_shape),
         disable_trt_plugin_fp16_(disable_trt_plugin_fp16),
         logger_(logger) {
-    if (min_input_shape_.size() != 0 && max_input_shape_.size() != 0 &&
+    if (min_input_shape_.size() != 0 || max_input_shape_.size() != 0 ||
         optim_input_shape_.size() != 0) {
       PADDLE_ENFORCE_EQ(
           min_input_shape_.size(), max_input_shape_.size(),
@@ -398,9 +398,12 @@ class TRTEngineManager {
       std::string name, int max_batch, int max_workspace,
       AnalysisConfig::Precision precision = AnalysisConfig::Precision::kFloat32,
       TRTInt8Calibrator* calibrator = nullptr, int device_id = 0,
-      const std::map<std::string, std::vector<int>> min_input_shape = {},
-      const std::map<std::string, std::vector<int>> max_input_shape = {},
-      const std::map<std::string, std::vector<int>> optim_input_shape = {},
+      const std::vector<std::map<std::string, std::vector<int>>>
+          min_input_shape = {},
+      const std::vector<std::map<std::string, std::vector<int>>>
+          max_input_shape = {},
+      const std::vector<std::map<std::string, std::vector<int>>>
+          optim_input_shape = {},
       bool disable_trt_plugin_fp16 = false,
       nvinfer1::ILogger& logger = NaiveLogger::Global()) {
     auto* p =

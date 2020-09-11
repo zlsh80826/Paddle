@@ -174,81 +174,24 @@ void TensorRTEngine::FreezeNetwork() {
   if (with_dynamic_shape_) {
 #if IS_TRT_VERSION_GE(6000)
     LOG(INFO) << "Run Paddle-TRT Dynamic Shape mode.";
-    /*
-        for (auto &input : min_input_shape_) {
-          optim_profile_->setDimensions(
-              input.first.c_str(), nvinfer1::OptProfileSelector::kMIN,
-              Vec2TRT_Dims(input.second, input.first, true));
-          optim_profile_->setDimensions(
-              input.first.c_str(), nvinfer1::OptProfileSelector::kMAX,
-              Vec2TRT_Dims(max_input_shape_[input.first], input.first, true));
-          optim_profile_->setDimensions(
-              input.first.c_str(), nvinfer1::OptProfileSelector::kOPT,
-              Vec2TRT_Dims(optim_input_shape_[input.first], input.first, true));
-        }
-        infer_builder_config_->addOptimizationProfile(optim_profile_);
-    */
 
-    // add input manually
-    optim_profile_ = infer_builder_->createOptimizationProfile();
-    for (auto &input : min_input_shape_) {
-      optim_profile_->setDimensions(input.first.c_str(),
-                                    nvinfer1::OptProfileSelector::kMIN,
-                                    nvinfer1::Dims3(23, 64, 1));
-      optim_profile_->setDimensions(input.first.c_str(),
-                                    nvinfer1::OptProfileSelector::kMAX,
-                                    nvinfer1::Dims3(32, 64, 1));
-      optim_profile_->setDimensions(input.first.c_str(),
-                                    nvinfer1::OptProfileSelector::kOPT,
-                                    nvinfer1::Dims3(32, 64, 1));
+    for (size_t i = 0; i < min_input_shape_.size(); ++i) {
+      auto profile = infer_builder_->createOptimizationProfile();
+      for (const auto &input : min_input_shape_[i]) {
+        profile->setDimensions(input.first.c_str(),
+                               nvinfer1::OptProfileSelector::kMIN,
+                               Vec2TRT_Dims(input.second, input.first, true));
+        profile->setDimensions(
+            input.first.c_str(), nvinfer1::OptProfileSelector::kMAX,
+            Vec2TRT_Dims(max_input_shape_[i][input.first], input.first, true));
+        profile->setDimensions(input.first.c_str(),
+                               nvinfer1::OptProfileSelector::kOPT,
+                               Vec2TRT_Dims(optim_input_shape_[i][input.first],
+                                            input.first, true));
+      }
+      infer_builder_config_->addOptimizationProfile(profile);
+      std::cerr << "set optimization profile [" << i << "] success.\n";
     }
-    infer_builder_config_->addOptimizationProfile(optim_profile_);
-    std::cerr << "set 64 seccessful." << std::endl;
-
-    optim_profile_ = infer_builder_->createOptimizationProfile();
-    for (auto &input : min_input_shape_) {
-      optim_profile_->setDimensions(input.first.c_str(),
-                                    nvinfer1::OptProfileSelector::kMIN,
-                                    nvinfer1::Dims3(23, 96, 1));
-      optim_profile_->setDimensions(input.first.c_str(),
-                                    nvinfer1::OptProfileSelector::kMAX,
-                                    nvinfer1::Dims3(32, 96, 1));
-      optim_profile_->setDimensions(input.first.c_str(),
-                                    nvinfer1::OptProfileSelector::kOPT,
-                                    nvinfer1::Dims3(32, 96, 1));
-    }
-    infer_builder_config_->addOptimizationProfile(optim_profile_);
-    std::cerr << "set 96 seccessful." << std::endl;
-
-    optim_profile_ = infer_builder_->createOptimizationProfile();
-    for (auto &input : min_input_shape_) {
-      optim_profile_->setDimensions(input.first.c_str(),
-                                    nvinfer1::OptProfileSelector::kMIN,
-                                    nvinfer1::Dims3(23, 128, 1));
-      optim_profile_->setDimensions(input.first.c_str(),
-                                    nvinfer1::OptProfileSelector::kMAX,
-                                    nvinfer1::Dims3(32, 128, 1));
-      optim_profile_->setDimensions(input.first.c_str(),
-                                    nvinfer1::OptProfileSelector::kOPT,
-                                    nvinfer1::Dims3(32, 128, 1));
-    }
-    infer_builder_config_->addOptimizationProfile(optim_profile_);
-    std::cerr << "set 128 seccessful." << std::endl;
-
-    optim_profile_ = infer_builder_->createOptimizationProfile();
-    for (auto &input : min_input_shape_) {
-      optim_profile_->setDimensions(input.first.c_str(),
-                                    nvinfer1::OptProfileSelector::kMIN,
-                                    nvinfer1::Dims3(23, 1, 1));
-      optim_profile_->setDimensions(input.first.c_str(),
-                                    nvinfer1::OptProfileSelector::kMAX,
-                                    nvinfer1::Dims3(32, 63, 1));
-      optim_profile_->setDimensions(input.first.c_str(),
-                                    nvinfer1::OptProfileSelector::kOPT,
-                                    nvinfer1::Dims3(32, 32, 1));
-    }
-    infer_builder_config_->addOptimizationProfile(optim_profile_);
-    std::cerr << "set 32 seccessful." << std::endl;
 
     infer_builder_config_->setMaxWorkspaceSize(max_workspace_);
     if (enable_int8) {

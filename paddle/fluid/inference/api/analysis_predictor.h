@@ -239,6 +239,8 @@ class AnalysisPredictor : public PaddlePredictor {
   ///
   void SaveOptimModel(const std::string &dir);
 
+  void SetOptimizationProfile(const int profile_index);
+
  protected:
   ///
   /// \brief Prepare predictor's required programs, including loading model

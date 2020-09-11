@@ -319,6 +319,12 @@ struct PD_INFER_DECL AnalysisConfig {
   /// \param passes_filter Set the passes used in Lite sub-graph engine.
   /// \param ops_filter Operators not supported by Lite.
   ///
+
+  int AddTRTDynamicShapeInfo(
+      const std::map<std::string, std::vector<int>>& min_input_shape,
+      const std::map<std::string, std::vector<int>>& max_input_shape,
+      const std::map<std::string, std::vector<int>>& optim_input_shape);
+
   void EnableLiteEngine(
       AnalysisConfig::Precision precision_mode = Precision::kFloat32,
       bool zero_copy = false,
@@ -561,9 +567,9 @@ struct PD_INFER_DECL AnalysisConfig {
   Precision tensorrt_precision_mode_{Precision::kFloat32};
   bool trt_use_static_engine_{false};
   bool trt_use_calib_mode_{true};
-  std::map<std::string, std::vector<int>> min_input_shape_{};
-  std::map<std::string, std::vector<int>> max_input_shape_{};
-  std::map<std::string, std::vector<int>> optim_input_shape_{};
+  std::vector<std::map<std::string, std::vector<int>>> min_input_shape_;
+  std::vector<std::map<std::string, std::vector<int>>> max_input_shape_;
+  std::vector<std::map<std::string, std::vector<int>>> optim_input_shape_;
   bool disable_trt_plugin_fp16_{false};
 
   // memory reuse related.

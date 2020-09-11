@@ -167,11 +167,14 @@ void TensorRtSubgraphPass::CreateTensorRTOp(
   auto use_calib_mode = Get<bool>("use_calib_mode");
   auto &subgraph_nodes = *framework::ir::Agent(node).subgraph();
   auto min_input_shape =
-      Get<std::map<std::string, std::vector<int>>>("min_input_shape");
+      Get<std::vector<std::map<std::string, std::vector<int>>>>(
+          "min_input_shape");
   auto max_input_shape =
-      Get<std::map<std::string, std::vector<int>>>("max_input_shape");
+      Get<std::vector<std::map<std::string, std::vector<int>>>>(
+          "max_input_shape");
   auto opt_input_shape =
-      Get<std::map<std::string, std::vector<int>>>("optim_input_shape");
+      Get<std::vector<std::map<std::string, std::vector<int>>>>(
+          "optim_input_shape");
 
   // The following procedure is used to rename all the intermediate
   // variables and the output variables of the subgraph.

@@ -278,6 +278,8 @@ class PD_INFER_DECL PaddlePredictor {
     return {};
   }
 
+  virtual void SetOptimizationProfile(int profile_index) {}
+
   /// \brief Used to get the name of the network output.
   /// Be inherited by AnalysisPredictor, Only used in ZeroCopy scenarios.
   /// \return Output tensor names.

@@ -1012,6 +1012,29 @@ void AnalysisPredictor::SaveOptimModel(const std::string &dir) {
   exe.Run(save_program, scope(), 0, true, true);
 }
 
+void AnalysisPredictor::SetOptimizationProfile(const int index) {
+#if PADDLE_WITH_TENSORRT
+  auto &block = inference_program_->Block(0);
+  for (auto &op_desc : block.AllOps()) {
+    if (op_desc->Type() == "tensorrt_engine") {
+      const std::string engine_name =
+          BOOST_GET_CONST(std::string, op_desc->GetAttr("engine_key"));
+      auto trt_engine =
+          inference::Singleton<inference::tensorrt::TRTEngineManager>::Global()
+              .Get(engine_name + std::to_string(predictor_id_));
+      const auto nb_opt_profile =
+          trt_engine->engine()->getNbOptimizationProfiles();
+      PADDLE_ENFORCE_LT(index, nb_opt_profile,
+                        platform::errors::InvalidArgument(
+                            "There is only %d optimization profile, but you "
+                            "set the index to %d, which is invalid."));
+
+      trt_engine->context()->setOptimizationProfile(index);
+    }
+  }
+#endif
+}
+
 template <>
 std::unique_ptr<PaddlePredictor> CreatePaddlePredictor<AnalysisConfig>(
     const AnalysisConfig &config) {

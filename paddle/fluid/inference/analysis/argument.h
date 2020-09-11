@@ -59,7 +59,7 @@ struct Argument {
 
   using unique_ptr_t = std::unique_ptr<void, std::function<void(void*)>>;
   using fusion_statis_t = std::unordered_map<std::string, int>;
-  using input_shape_t = std::map<std::string, std::vector<int>>;
+  using input_shape_t = std::vector<std::map<std::string, std::vector<int>>>;
 
   bool Has(const std::string& key) const { return valid_fields_.count(key); }
   // If we set the model using config.SetModelBuffer,
