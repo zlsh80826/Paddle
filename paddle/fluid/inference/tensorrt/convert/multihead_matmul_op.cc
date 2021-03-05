@@ -26,6 +26,9 @@ class MultiheadMatMulOpConverter : public OpConverter {
 #if IS_TRT_VERSION_GE(6000)
     VLOG(3) << "convert a fluid multihead_mamul op to a corresponding tensorrt "
                "network structure";
+
+    std::cout << "multihead converter" << std::endl;
+
     framework::OpDesc op_desc(op, nullptr);
     // Declare inputs
     // Shouble be a 5 dims tensor.
@@ -49,14 +52,21 @@ class MultiheadMatMulOpConverter : public OpConverter {
     memcpy(weight_data_tmp.data(), weight_data,
            weight_t->numel() * sizeof(float));
 
-    // (hidden, 3, all_head_size)
+    // (hidden, 3, hidden_out)
     auto weight_dims = weight_t->dims();
 
-    int hidden = weight_dims[0];         // channels_in
+    int hidden_in = weight_dims[0];         // channels_in
     int three = weight_dims[1];          // channels_out
-    int all_head_size = weight_dims[2];  // channels_out
-    int m = hidden;
-    int n = three * all_head_size;
+    int hidden_out = weight_dims[2];  // channels_out
+    int m = hidden_in;
+    int n = three * hidden_out;
+
+    std::cerr << "hidden_in: " << hidden_in << std::endl;
+    std::cerr << "three: " << three << std::endl;
+    std::cerr << "hidden_out: " << hidden_out << std::endl;
+    std::cerr << "m: " << m << std::endl;
+    std::cerr << "n: " << n << std::endl;
+
     auto tranpose_weight = [](const float* src, float* dst, int m, int n) {
       for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
@@ -66,22 +76,21 @@ class MultiheadMatMulOpConverter : public OpConverter {
     };
     tranpose_weight(weight_data_tmp.data(), weight_data, m, n);
 
-    int head_number = BOOST_GET_CONST(int, op_desc.GetAttr("head_number"));
+    int num_head = BOOST_GET_CONST(int, op_desc.GetAttr("head_number"));
 
     nvinfer1::ILayer* layer = nullptr;
 
     if (engine_->with_dynamic_shape()) {
       if (engine_->use_oss()) {
-        int head_size = hidden / head_number;
+        int h_out = hidden_out / num_head;
         // [3, Nout, Hout, Nin, Hin] -> [Nout, 3, Hout, Nin, Hin]
-        auto transpose_weight_v2 = [](const float* src, float* dst, int N,
-                                      int H) {
-          const int HNH = H * N * H;
+        auto transpose_weight_v2 = [](const float* src, float* dst, int n_out, int h_out, int hidden_in) {
+          const int HNH = h_out * hidden_in;
           for (int i = 0; i < 3; ++i) {
-            for (int n = 0; n < N; ++n) {
+            for (int n = 0; n < n_out; ++n) {
               for (int hnh = 0; hnh < HNH; ++hnh) {
                 dst[n * 3 * HNH + i * HNH + hnh] =
-                    src[i * N * HNH + n * HNH + hnh];
+                    src[i * n_out * HNH + n * HNH + hnh];
               }
             }
           }
@@ -99,8 +108,8 @@ class MultiheadMatMulOpConverter : public OpConverter {
         };
         memcpy(weight_data_tmp.data(), weight_data,
                weight_t->numel() * sizeof(float));
-        transpose_weight_v2(weight_data_tmp.data(), weight_data, head_number,
-                            head_size);
+        transpose_weight_v2(weight_data_tmp.data(), weight_data, num_head,
+                            h_out, hidden_in);
         nvinfer1::Weights weight{nvinfer1::DataType::kFLOAT,
                                  static_cast<void*>(weight_data),
                                  static_cast<int32_t>(weight_t->numel())};
@@ -109,8 +118,8 @@ class MultiheadMatMulOpConverter : public OpConverter {
         bias_data_tmp.reserve(bias_t->numel());
         memcpy(bias_data_tmp.data(), bias_data,
                bias_t->numel() * sizeof(float));
-        transpose_bias_v2(bias_data_tmp.data(), bias_data, head_number,
-                          head_size);
+        transpose_bias_v2(bias_data_tmp.data(), bias_data, num_head,
+                          h_out);
         nvinfer1::Weights bias{nvinfer1::DataType::kFLOAT,
                                static_cast<void*>(bias_data),
                                static_cast<int32_t>(bias_t->numel())};
@@ -130,8 +139,8 @@ class MultiheadMatMulOpConverter : public OpConverter {
         int var_seqlen = 1;
         const std::vector<nvinfer1::PluginField> fields{
             {"type_id", &type, nvinfer1::PluginFieldType::kINT32, 1},
-            {"hidden_size", &hidden, nvinfer1::PluginFieldType::kINT32, 1},
-            {"num_heads", &head_number, nvinfer1::PluginFieldType::kINT32, 1},
+            {"hidden_size", &hidden_out, nvinfer1::PluginFieldType::kINT32, 1},
+            {"num_heads", &num_head, nvinfer1::PluginFieldType::kINT32, 1},
             {"has_mask", &has_mask, nvinfer1::PluginFieldType::kINT32, 1},
             {"var_seqlen", &var_seqlen, nvinfer1::PluginFieldType::kINT32, 1},
         };
@@ -186,7 +195,7 @@ class MultiheadMatMulOpConverter : public OpConverter {
                                               n, weight.get(), bias.get());
         auto* fc_out = fc_layer->getOutput(0);
         // add qkv to context
-        int head_size = all_head_size / head_number;
+        int head_size = hidden_out / num_head;
         float scale = BOOST_GET_CONST(float, op_desc.GetAttr("alpha"));
 
         std::vector<nvinfer1::ITensor*> plugin_inputs;
@@ -195,7 +204,7 @@ class MultiheadMatMulOpConverter : public OpConverter {
         bool with_fp16 =
             engine_->WithFp16() && !engine_->disable_trt_plugin_fp16();
         plugin::DynamicPluginTensorRT* plugin =
-            new plugin::QkvToContextPluginDynamic(hidden, head_number,
+            new plugin::QkvToContextPluginDynamic(hidden_in, num_head,
                                                   head_size, scale, with_fp16);
         layer = engine_->AddPluginV2(plugin_inputs.data(), 2, plugin);
       }
