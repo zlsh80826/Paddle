@@ -1195,6 +1195,7 @@ USE_TRT_CONVERTER(gather);
 USE_TRT_CONVERTER(affine_channel);
 USE_TRT_CONVERTER(nearest_interp);
 USE_TRT_CONVERTER(anchor_generator);
+USE_TRT_CONVERTER(roi_align);
 #endif
 
 namespace paddle_infer {
