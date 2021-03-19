@@ -113,6 +113,7 @@ struct SimpleOpTypeSetTeller : public Teller {
       "gather",
       "affine_channel",
       "nearest_interp",
+      "anchor_generator",
   };
 };
 

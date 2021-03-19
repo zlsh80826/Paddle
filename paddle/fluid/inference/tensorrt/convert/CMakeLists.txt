@@ -8,6 +8,7 @@ nv_library(tensorrt_converter
                 gather_op.cc
                 affine_channel_op.cc
                 nearest_interp_op.cc
+                anchor_generator_op.cc
            DEPS tensorrt_engine tensorrt_plugin operator scope framework_proto op_registry)
 
 nv_test(test_op_converter SRCS test_op_converter.cc DEPS
