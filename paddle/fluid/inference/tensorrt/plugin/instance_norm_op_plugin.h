@@ -39,7 +39,7 @@ class InstanceNormPlugin : public PluginTensorRT {
   cudnnTensorDescriptor_t x_desc_, y_desc_, b_desc_;
 
  protected:
-  size_t getSerializationSize() override {
+  size_t getSerializationSize() const TRT_NOEXCEPT override {
     return getBaseSerializationSize() + SerializedSize(eps_) +
            SerializedSize(scale_) + SerializedSize(bias_) +
            SerializedSize(getPluginType());
@@ -48,7 +48,7 @@ class InstanceNormPlugin : public PluginTensorRT {
   // TRT will call this func when we need to serialize the configuration of
   // tensorrt.
   // It should not be called by users.
-  void serialize(void *buffer) override {
+  void serialize(void *buffer) const TRT_NOEXCEPT override {
     SerializeValue(&buffer, getPluginType());
     serializeBase(buffer);
     SerializeValue(&buffer, eps_);
@@ -91,24 +91,28 @@ class InstanceNormPlugin : public PluginTensorRT {
     platform::dynload::cudnnDestroyTensorDescriptor(y_desc_);
     platform::dynload::cudnnDestroyTensorDescriptor(b_desc_);
   }
-  int initialize() override;
+  int initialize() TRT_NOEXCEPT override;
 
-  InstanceNormPlugin *clone() const override {
+  InstanceNormPlugin *clone() const TRT_NOEXCEPT override {
     return new InstanceNormPlugin(eps_, scale_, bias_);
   }
 
-  const char *getPluginType() const override { return "instance_norm_plugin"; }
-  int getNbOutputs() const override { return 1; }
+  const char *getPluginType() const TRT_NOEXCEPT override { return "instance_norm_plugin"; }
+  int getNbOutputs() const TRT_NOEXCEPT override { return 1; }
   nvinfer1::Dims getOutputDimensions(int index, const nvinfer1::Dims *inputs,
-                                     int nbInputDims) override;
+                                     int nbInputDims) TRT_NOEXCEPT override;
+#if IS_TRT_VERSION_LT(8000)
   int enqueue(int batchSize, const void *const *inputs, void **outputs,
-              void *workspace, cudaStream_t stream) override;
+#else
+  int enqueue(int batchSize, const void *const *inputs, void *const *outputs,
+#endif
+              void *workspace, cudaStream_t stream) TRT_NOEXCEPT override;
 
   bool supportsFormat(nvinfer1::DataType type,
-                      nvinfer1::PluginFormat format) const override {
+                      nvinfer1::PluginFormat format) const TRT_NOEXCEPT override {
     return ((type == nvinfer1::DataType::kFLOAT ||
              type == nvinfer1::DataType::kHALF) &&
-            (format == nvinfer1::PluginFormat::kNCHW));
+            (format == nvinfer1::PluginFormat::kLINEAR));
   }
 };
 
