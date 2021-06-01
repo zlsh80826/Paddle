@@ -55,7 +55,7 @@ __global__ void elementwise_kernel(const size_t total, const T *x_data,
 }
 
 nvinfer1::Dims ElementWisePlugin::getOutputDimensions(
-    int index, const nvinfer1::Dims *input_dims, int num_inputs) {
+    int index, const nvinfer1::Dims *input_dims, int num_inputs) TRT_NOEXCEPT {
   PADDLE_ENFORCE_EQ(index, 0, platform::errors::InvalidArgument(
                                   "There is only one output in TRT elementwise "
                                   "op plugin, but got output index: %d.",
@@ -71,7 +71,7 @@ nvinfer1::Dims ElementWisePlugin::getOutputDimensions(
   return input_dims[0];
 }
 
-int ElementWisePlugin::initialize() {
+int ElementWisePlugin::initialize() TRT_NOEXCEPT {
   PADDLE_ENFORCE_GT(dims_y_.nbDims, 0,
                     platform::errors::InvalidArgument(
                         "The dimension of input Y of TRT elementwise op plugin "
@@ -121,9 +121,9 @@ int ElementWisePlugin::initialize() {
   return 0;
 }
 
-int ElementWisePlugin::enqueue(int batch_size, const void *const *inputs,
-                               void **outputs, void *workspace,
-                               cudaStream_t stream) {
+int ElementWisePlugin::enqueue(int batch_size, void const *const *inputs,
+			       void *const *outputs, void *workspace,
+                               cudaStream_t stream) TRT_NOEXCEPT {
   const float *x = reinterpret_cast<const float *>(inputs[0]);
   const float *y = reinterpret_cast<const float *>(inputs[1]);
   float *out = reinterpret_cast<float *>(outputs[0]);
@@ -150,21 +150,21 @@ int ElementWisePlugin::enqueue(int batch_size, const void *const *inputs,
 // Dynamic Plugin below.
 #if IS_TRT_VERSION_GE(6000)
 
-int ElementwisePluginDynamic::initialize() { return 0; }
+int ElementwisePluginDynamic::initialize() TRT_NOEXCEPT { return 0; }
 
-size_t ElementwisePluginDynamic::getSerializationSize() const { return 0; }
+size_t ElementwisePluginDynamic::getSerializationSize() const TRT_NOEXCEPT { return 0; }
 
-void ElementwisePluginDynamic::serialize(void *buffer) const {}
+void ElementwisePluginDynamic::serialize(void *buffer) const TRT_NOEXCEPT {}
 
 nvinfer1::DimsExprs ElementwisePluginDynamic::getOutputDimensions(
     int output_index, const nvinfer1::DimsExprs *inputs, int nb_inputs,
-    nvinfer1::IExprBuilder &expr_builder) {
+    nvinfer1::IExprBuilder &expr_builder) TRT_NOEXCEPT {
   return inputs[0];
 }
 
 bool ElementwisePluginDynamic::supportsFormatCombination(
     int pos, const nvinfer1::PluginTensorDesc *in_out, int nb_inputs,
-    int nb_outputs) {
+    int nb_outputs) TRT_NOEXCEPT {
   PADDLE_ENFORCE_NOT_NULL(
       in_out, platform::errors::InvalidArgument(
                   "The input of swish plugin shoule not be nullptr."));
@@ -187,7 +187,7 @@ bool ElementwisePluginDynamic::supportsFormatCombination(
 }
 
 nvinfer1::DataType ElementwisePluginDynamic::getOutputDataType(
-    int index, const nvinfer1::DataType *input_types, int nb_inputs) const {
+    int index, const nvinfer1::DataType *input_types, int nb_inputs) const TRT_NOEXCEPT {
   PADDLE_ENFORCE_EQ(index, 0,
                     platform::errors::InvalidArgument(
                         "The Elementwise Plugin only has one input, so the "
@@ -199,7 +199,7 @@ nvinfer1::DataType ElementwisePluginDynamic::getOutputDataType(
 int ElementwisePluginDynamic::enqueue(
     const nvinfer1::PluginTensorDesc *input_desc,
     const nvinfer1::PluginTensorDesc *output_desc, const void *const *inputs,
-    void *const *outputs, void *workspace, cudaStream_t stream) {
+    void *const *outputs, void *workspace, cudaStream_t stream) TRT_NOEXCEPT {
   auto x_dims = input_desc[0].dims;
   auto y_dims = input_desc[1].dims;
   int axis = (axis_ == -1) ? x_dims.nbDims - y_dims.nbDims : axis_;
