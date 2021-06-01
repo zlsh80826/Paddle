@@ -40,7 +40,7 @@ class LayerNormPlugin : public PluginTensorRT {
   std::vector<int64_t> variance_shape_;
 
  protected:
-  size_t getSerializationSize() override {
+  size_t getSerializationSize() const TRT_NOEXCEPT override {
     return getBaseSerializationSize() + SerializedSize(bias_) +
            SerializedSize(scale_) + SerializedSize(begin_norm_axis_) +
            SerializedSize(eps_) + SerializedSize(mean_shape_) +
@@ -50,7 +50,7 @@ class LayerNormPlugin : public PluginTensorRT {
   // TRT will call this func when we need to serialize the configuration of
   // tensorrt.
   // It should not be called by users.
-  void serialize(void *buffer) override {
+  void serialize(void *buffer) const TRT_NOEXCEPT override {
     SerializeValue(&buffer, getPluginType());
     serializeBase(buffer);
     SerializeValue(&buffer, bias_);
@@ -88,20 +88,24 @@ class LayerNormPlugin : public PluginTensorRT {
     DeserializeValue(&serialData, &serialLength, &variance_shape_);
   }
   ~LayerNormPlugin() {}
-  int initialize() override;
+  int initialize() TRT_NOEXCEPT override;
 
-  LayerNormPlugin *clone() const override {
+  LayerNormPlugin *clone() const TRT_NOEXCEPT override {
     return new LayerNormPlugin(bias_.data(), bias_.size(), scale_.data(),
                                scale_.size(), begin_norm_axis_, eps_,
                                mean_shape_, variance_shape_);
   }
 
-  const char *getPluginType() const override { return "layer_norm_plugin"; }
-  int getNbOutputs() const override { return 1; }
+  const char *getPluginType() const TRT_NOEXCEPT override { return "layer_norm_plugin"; }
+  int getNbOutputs() const TRT_NOEXCEPT override { return 1; }
   nvinfer1::Dims getOutputDimensions(int index, const nvinfer1::Dims *inputs,
-                                     int nbInputDims) override;
+                                     int nbInputDims) TRT_NOEXCEPT override;
+#if IS_TRT_VERSION_LT(8000)
   int enqueue(int batchSize, const void *const *inputs, void **outputs,
-              void *workspace, cudaStream_t stream) override;
+#else
+  int enqueue(int batchSize, const void *const *inputs, void *const *outputs,
+#endif
+              void *workspace, cudaStream_t stream) TRT_NOEXCEPT override;
 };
 
 }  // namespace plugin

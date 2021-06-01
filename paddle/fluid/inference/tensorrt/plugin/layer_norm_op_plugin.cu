@@ -31,10 +31,10 @@ LayerNormPlugin *CreateLayerNormPluginDeserialize(const void *buffer,
 }
 REGISTER_TRT_PLUGIN("layer_norm_plugin", CreateLayerNormPluginDeserialize);
 
-int LayerNormPlugin::initialize() { return 0; }
+int LayerNormPlugin::initialize() TRT_NOEXCEPT { return 0; }
 
 nvinfer1::Dims LayerNormPlugin::getOutputDimensions(
-    int index, const nvinfer1::Dims *inputDims, int nbInputs) {
+    int index, const nvinfer1::Dims *inputDims, int nbInputs) TRT_NOEXCEPT {
   assert(nbInputs == 1);
   assert(index < this->getNbOutputs());
   nvinfer1::Dims const &input_dims = inputDims[0];
@@ -43,11 +43,19 @@ nvinfer1::Dims LayerNormPlugin::getOutputDimensions(
 }
 
 int LayerNormPlugin::enqueue(int batch_size, const void *const *inputs,
+#if IS_TRT_VERSION_LT(8000)
                              void **outputs, void *workspace,
-                             cudaStream_t stream) {
+#else
+                             void *const *outputs, void *workspace,
+#endif
+                             cudaStream_t stream) TRT_NOEXCEPT {
   const auto &input_dims = this->getInputDims(0);
   const float *input = reinterpret_cast<const float *>(inputs[0]);
+#if IS_TRT_VERSION_LT(8000)
   float *output = reinterpret_cast<float **>(outputs)[0];
+#else
+  float *const output = reinterpret_cast<float *const>(outputs[0]);
+#endif
   int begin_norm_axis = begin_norm_axis_;
   float eps = eps_;
 
