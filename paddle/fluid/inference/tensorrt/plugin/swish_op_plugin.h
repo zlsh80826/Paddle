@@ -31,7 +31,7 @@ class SwishPlugin : public PluginTensorRT {
   float beta_;
 
  protected:
-  size_t getSerializationSize() override {
+  size_t getSerializationSize() const TRT_NOEXCEPT override {
     return SerializedSize(getPluginType()) + getBaseSerializationSize() +
            SerializedSize(beta_);
   }
@@ -39,7 +39,7 @@ class SwishPlugin : public PluginTensorRT {
   // TRT will call this func when we need to serialize the configuration of
   // tensorrt.
   // It should not be called by users.
-  void serialize(void* buffer) override {
+  void serialize(void* buffer) const TRT_NOEXCEPT override {
     SerializeValue(&buffer, getPluginType());
     serializeBase(buffer);
     SerializeValue(&buffer, beta_);
@@ -57,18 +57,18 @@ class SwishPlugin : public PluginTensorRT {
     DeserializeValue(&serialData, &serialLength, &beta_);
   }
   ~SwishPlugin() {}
-  int initialize() override;
+  int initialize() TRT_NOEXCEPT override;
 
-  SwishPlugin* clone() const override {
+  SwishPlugin* clone() const TRT_NOEXCEPT override {
     return new SwishPlugin(beta_, with_fp16_);
   }
 
-  const char* getPluginType() const override { return "swish_plugin"; }
-  int getNbOutputs() const override { return 1; }
+  const char* getPluginType() const TRT_NOEXCEPT override { return "swish_plugin"; }
+  int getNbOutputs() const TRT_NOEXCEPT override { return 1; }
   nvinfer1::Dims getOutputDimensions(int index, const nvinfer1::Dims* inputs,
-                                     int nbInputDims) override;
-  int enqueue(int batchSize, const void* const* inputs, void** outputs,
-              void* workspace, cudaStream_t stream) override;
+                                     int nbInputDims) TRT_NOEXCEPT override;
+  int enqueue(int batchSize, void const *const *inputs, void *const *outputs,
+              void* workspace, cudaStream_t stream) TRT_NOEXCEPT override;
 };
 
 #if IS_TRT_VERSION_GE(6000)
@@ -82,46 +82,46 @@ class SwishPluginDynamic : public DynamicPluginTensorRT {
     DeserializeValue(&serialData, &serialLength, &beta_);
     DeserializeValue(&serialData, &serialLength, &with_fp16_);
   }
-  nvinfer1::IPluginV2DynamicExt* clone() const override {
+  nvinfer1::IPluginV2DynamicExt* clone() const TRT_NOEXCEPT override {
     return new SwishPluginDynamic(beta_, with_fp16_);
   }
 
-  const char* getPluginType() const override { return "swish_plugin"; }
-  int getNbOutputs() const override { return 1; }
-  int initialize() override;
+  const char* getPluginType() const TRT_NOEXCEPT override { return "swish_plugin"; }
+  int getNbOutputs() const TRT_NOEXCEPT override { return 1; }
+  int initialize() TRT_NOEXCEPT override;
 
-  size_t getSerializationSize() const override;
-  void serialize(void* buffer) const override;
+  size_t getSerializationSize() const TRT_NOEXCEPT override;
+  void serialize(void* buffer) const TRT_NOEXCEPT override;
 
   nvinfer1::DimsExprs getOutputDimensions(
       int output_index, const nvinfer1::DimsExprs* inputs, int nb_inputs,
-      nvinfer1::IExprBuilder& expr_builder) override;
+      nvinfer1::IExprBuilder& expr_builder) TRT_NOEXCEPT override;
 
   bool supportsFormatCombination(int pos,
                                  const nvinfer1::PluginTensorDesc* inOut,
-                                 int nbInputs, int nbOutputs) override;
+                                 int nbInputs, int nbOutputs) TRT_NOEXCEPT override;
 
   void configurePlugin(const nvinfer1::DynamicPluginTensorDesc* in,
                        int nbInputs,
                        const nvinfer1::DynamicPluginTensorDesc* out,
-                       int nbOutputs) override {}
+                       int nbOutputs) TRT_NOEXCEPT override {}
 
   size_t getWorkspaceSize(const nvinfer1::PluginTensorDesc* inputs,
                           int nbInputs,
                           const nvinfer1::PluginTensorDesc* outputs,
-                          int nbOutputs) const override {
+                          int nbOutputs) const TRT_NOEXCEPT override {
     return 0;
   }
 
   int enqueue(const nvinfer1::PluginTensorDesc* inputDesc,
               const nvinfer1::PluginTensorDesc* outputDesc,
               const void* const* inputs, void* const* outputs, void* workspace,
-              cudaStream_t stream) override;
+              cudaStream_t stream) TRT_NOEXCEPT override;
   nvinfer1::DataType getOutputDataType(int index,
                                        const nvinfer1::DataType* inputTypes,
-                                       int nbInputs) const override;
+                                       int nbInputs) const TRT_NOEXCEPT override;
 
-  void destroy() override { delete this; }
+  void destroy() TRT_NOEXCEPT override { delete this; }
 
  private:
   float beta_;
@@ -130,31 +130,31 @@ class SwishPluginDynamic : public DynamicPluginTensorRT {
 class SwishPluginV2Creator : public nvinfer1::IPluginCreator {
  public:
   SwishPluginV2Creator() {}
-  const char* getPluginName() const override { return "swish_plugin"; }
+  const char* getPluginName() const TRT_NOEXCEPT override { return "swish_plugin"; }
 
-  const char* getPluginVersion() const override { return "1"; }
+  const char* getPluginVersion() const TRT_NOEXCEPT override { return "1"; }
 
-  const nvinfer1::PluginFieldCollection* getFieldNames() override {
+  const nvinfer1::PluginFieldCollection* getFieldNames() TRT_NOEXCEPT override {
     return &field_collection_;
   }
 
   nvinfer1::IPluginV2* createPlugin(
-      const char* name, const nvinfer1::PluginFieldCollection* fc) override {
+      const char* name, const nvinfer1::PluginFieldCollection* fc) TRT_NOEXCEPT override {
     return nullptr;
   }
 
   nvinfer1::IPluginV2* deserializePlugin(const char* name,
                                          const void* serial_data,
-                                         size_t serial_length) override {
+                                         size_t serial_length) TRT_NOEXCEPT override {
     auto plugin = new SwishPluginDynamic(serial_data, serial_length);
     return plugin;
   }
 
-  void setPluginNamespace(const char* lib_namespace) override {
+  void setPluginNamespace(const char* lib_namespace) TRT_NOEXCEPT override {
     plugin_namespace_ = lib_namespace;
   }
 
-  const char* getPluginNamespace() const override {
+  const char* getPluginNamespace() const TRT_NOEXCEPT override {
     return plugin_namespace_.c_str();
   }
 

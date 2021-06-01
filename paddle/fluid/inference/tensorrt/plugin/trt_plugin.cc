@@ -19,7 +19,7 @@ namespace inference {
 namespace tensorrt {
 namespace plugin {
 
-void PluginTensorRT::serializeBase(void*& buffer) {
+void PluginTensorRT::serializeBase(void*& buffer) const {
   SerializeValue(&buffer, input_dims_);
   SerializeValue(&buffer, max_batch_size_);
   SerializeValue(&buffer, data_type_);
@@ -36,26 +36,38 @@ void PluginTensorRT::deserializeBase(void const*& serial_data,
   DeserializeValue(&serial_data, &serial_length, &with_fp16_);
 }
 
-size_t PluginTensorRT::getBaseSerializationSize() {
+size_t PluginTensorRT::getBaseSerializationSize() const {
   return (SerializedSize(input_dims_) + SerializedSize(max_batch_size_) +
           SerializedSize(data_type_) + SerializedSize(data_format_) +
           SerializedSize(with_fp16_));
 }
 
 bool PluginTensorRT::supportsFormat(nvinfer1::DataType type,
-                                    nvinfer1::PluginFormat format) const {
+                                    nvinfer1::PluginFormat format) const TRT_NOEXCEPT {
   return ((type == nvinfer1::DataType::kFLOAT) &&
-          (format == nvinfer1::PluginFormat::kNCHW));
+          (format == nvinfer1::PluginFormat::kLINEAR));
 }
 
 void PluginTensorRT::configureWithFormat(
     const nvinfer1::Dims* input_dims, int num_inputs,
     const nvinfer1::Dims* output_dims, int num_outputs, nvinfer1::DataType type,
-    nvinfer1::PluginFormat format, int max_batch_size) {
+    nvinfer1::PluginFormat format, int max_batch_size) TRT_NOEXCEPT {
   data_type_ = type;
   data_format_ = format;
   input_dims_.assign(input_dims, input_dims + num_inputs);
   max_batch_size_ = max_batch_size;
+}
+
+void PluginTensorRT::setPluginNamespace(nvinfer1::AsciiChar const *plugin_namespace) TRT_NOEXCEPT {
+  namespace_ = plugin_namespace;
+}
+
+nvinfer1::AsciiChar const* PluginTensorRT::getPluginNamespace() const TRT_NOEXCEPT {
+  return namespace_;
+}
+
+void PluginTensorRT::destroy() TRT_NOEXCEPT {
+  delete this;
 }
 
 }  // namespace plugin

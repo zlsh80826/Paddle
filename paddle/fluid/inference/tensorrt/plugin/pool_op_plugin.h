@@ -57,7 +57,7 @@ static std::vector<int> CalcOutputSize(const std::vector<int>& input_shape,
 
 class PoolPlugin : public PluginTensorRT {
  protected:
-  size_t getSerializationSize() override {
+  size_t getSerializationSize() const TRT_NOEXCEPT override {
     return SerializedSize(getPluginType()) + SerializedSize(ceil_mode_) +
            SerializedSize(pool_type_) + SerializedSize(adaptive_) +
            SerializedSize(ksize_) + SerializedSize(strides_) +
@@ -67,7 +67,7 @@ class PoolPlugin : public PluginTensorRT {
 
   // TRT will call this func when we need to serialize the configuration of
   // tensorrt.
-  void serialize(void* buffer) override {
+  void serialize(void* buffer) const TRT_NOEXCEPT override {
     SerializeValue(&buffer, getPluginType());
     serializeBase(buffer);
     SerializeValue(&buffer, ceil_mode_);
@@ -118,18 +118,18 @@ class PoolPlugin : public PluginTensorRT {
     DeserializeValue(&serialData, &serialLength, &output_shape_);
   }
 
-  PoolPlugin* clone() const override {
+  PoolPlugin* clone() const TRT_NOEXCEPT override {
     return new PoolPlugin(ceil_mode_, pool_type_, adaptive_, ksize_, strides_,
                           paddings_, input_shape_);
   }
 
-  const char* getPluginType() const override { return "pool_plugin"; }
-  int getNbOutputs() const override { return 1; }
+  const char* getPluginType() const TRT_NOEXCEPT override { return "pool_plugin"; }
+  int getNbOutputs() const TRT_NOEXCEPT override { return 1; }
   nvinfer1::Dims getOutputDimensions(int index, const nvinfer1::Dims* inputs,
-                                     int nbInputDims) override;
-  int initialize() override { return 0; }
-  int enqueue(int batchSize, const void* const* inputs, void** outputs,
-              void* workspace, cudaStream_t stream) override;
+                                     int nbInputDims) TRT_NOEXCEPT override;
+  int initialize() TRT_NOEXCEPT override { return 0; }
+  int enqueue(int batchSize, void const *const *inputs, void *const *outputs,
+              void* workspace, cudaStream_t stream) TRT_NOEXCEPT override;
 
  private:
   bool ceil_mode_;
@@ -171,47 +171,47 @@ class PoolPluginDynamic : public DynamicPluginTensorRT {
     DeserializeValue(&serialData, &serialLength, &is_global_);
   }
   ~PoolPluginDynamic() {}
-  nvinfer1::IPluginV2DynamicExt* clone() const override {
+  nvinfer1::IPluginV2DynamicExt* clone() const TRT_NOEXCEPT override {
     return new PoolPluginDynamic(ceil_mode_, pool_type_, adaptive_, ksize_,
                                  strides_, paddings_, is_global_);
   }
 
-  const char* getPluginType() const override { return "pool_plugin"; }
-  int getNbOutputs() const override { return 1; }
-  int initialize() override { return 0; }
+  const char* getPluginType() const TRT_NOEXCEPT override { return "pool_plugin"; }
+  int getNbOutputs() const TRT_NOEXCEPT override { return 1; }
+  int initialize() TRT_NOEXCEPT override { return 0; }
 
-  size_t getSerializationSize() const override;
-  void serialize(void* buffer) const override;
+  size_t getSerializationSize() const TRT_NOEXCEPT override;
+  void serialize(void* buffer) const TRT_NOEXCEPT override;
 
   nvinfer1::DimsExprs getOutputDimensions(
       int output_index, const nvinfer1::DimsExprs* inputs, int nb_inputs,
-      nvinfer1::IExprBuilder& expr_builder) override;
+      nvinfer1::IExprBuilder& expr_builder) TRT_NOEXCEPT override;
 
   bool supportsFormatCombination(int pos,
                                  const nvinfer1::PluginTensorDesc* inOut,
-                                 int nbInputs, int nbOutputs) override;
+                                 int nbInputs, int nbOutputs) TRT_NOEXCEPT override;
 
   void configurePlugin(const nvinfer1::DynamicPluginTensorDesc* in,
                        int nbInputs,
                        const nvinfer1::DynamicPluginTensorDesc* out,
-                       int nbOutputs) override {}
+                       int nbOutputs) TRT_NOEXCEPT override {}
 
   size_t getWorkspaceSize(const nvinfer1::PluginTensorDesc* inputs,
                           int nbInputs,
                           const nvinfer1::PluginTensorDesc* outputs,
-                          int nbOutputs) const override {
+                          int nbOutputs) const TRT_NOEXCEPT override {
     return 0;
   }
 
   int enqueue(const nvinfer1::PluginTensorDesc* inputDesc,
               const nvinfer1::PluginTensorDesc* outputDesc,
               const void* const* inputs, void* const* outputs, void* workspace,
-              cudaStream_t stream) override;
+              cudaStream_t stream) TRT_NOEXCEPT override;
   nvinfer1::DataType getOutputDataType(int index,
                                        const nvinfer1::DataType* inputTypes,
-                                       int nbInputs) const override;
+                                       int nbInputs) const TRT_NOEXCEPT override;
 
-  void destroy() override { delete this; }
+  void destroy() TRT_NOEXCEPT override { delete this; }
 
  private:
   bool ceil_mode_;
