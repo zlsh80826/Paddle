@@ -73,7 +73,7 @@ class InstanceNormOpConverter : public OpConverter {
     plugin::InstanceNormPlugin* plugin =
         new plugin::InstanceNormPlugin(eps, scale_v, bias_v);
     plugin->getPluginType();
-    nvinfer1::IPluginLayer* layer = engine_->AddPlugin(&input, 1, plugin);
+    nvinfer1::IPluginV2Layer* layer = engine_->AddPlugin(&input, 1, plugin);
 
     auto output_name = op_desc.Output("Y")[0];
     RreplenishLayerAndOutput(layer, "instance_norm", {output_name}, test_mode);

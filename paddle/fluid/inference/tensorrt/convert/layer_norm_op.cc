@@ -90,7 +90,7 @@ class LayerNormOpConverter : public OpConverter {
     plugin::LayerNormPlugin* plugin = new plugin::LayerNormPlugin(
         bias_data, bias_tensor->numel(), scale_data, scale_tensor->numel(),
         begin_norm_axis, eps, mean_shape, variance_shape);
-    nvinfer1::IPluginLayer* layernorm_layer = engine_->AddPlugin(&X, 1, plugin);
+    nvinfer1::IPluginV2Layer* layernorm_layer = engine_->AddPlugin(&X, 1, plugin);
 
     auto output_name = op_desc.Output("Y").front();
     engine_->SetWeights(op_desc.Input("Bias").front(), std::move(bias_tensor));
