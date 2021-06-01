@@ -30,7 +30,7 @@ HardSwishPlugin* CreateHardSwishPluginDeserialize(const void* buffer,
 REGISTER_TRT_PLUGIN("hard_swish_plugin", CreateHardSwishPluginDeserialize);
 
 nvinfer1::Dims HardSwishPlugin::getOutputDimensions(
-    int index, const nvinfer1::Dims* in_dims, int nb_inputs) {
+    int index, const nvinfer1::Dims* in_dims, int nb_inputs) TRT_NOEXCEPT {
   assert(nb_inputs == 1);
   assert(index < this->getNbOutputs());
   nvinfer1::Dims const& input_dims = in_dims[0];
@@ -58,8 +58,12 @@ __global__ void hard_swish_kernel(float threshold, float scale, float offset,
   }
 }
 
-int HardSwishPlugin::enqueue(int batch_size, const void* const* inputs,
-                             void** outputs, void*, cudaStream_t stream) {
+int HardSwishPlugin::enqueue(int batch_size, const void *const *inputs,
+#if IS_TRT_VERSION_LT(8000)
+                             void **outputs, void*, cudaStream_t stream) TRT_NOEXCEPT {
+#else
+                             void *const *outputs, void*, cudaStream_t stream) TRT_NOEXCEPT {
+#endif
   const auto& input_dims = this->getInputDims(0);
   int num = batch_size;
   for (int i = 0; i < input_dims.nbDims; i++) {

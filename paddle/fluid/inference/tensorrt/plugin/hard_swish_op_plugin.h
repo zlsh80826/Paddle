@@ -40,24 +40,23 @@ class HardSwishPlugin : public PluginTensorRT {
   }
 
   ~HardSwishPlugin() {}
-  HardSwishPlugin* clone() const override {
+  HardSwishPlugin* clone() const TRT_NOEXCEPT override {
     return new HardSwishPlugin(threshold_, scale_, offset_);
   }
 
-  const char* getPluginType() const override { return "hard_swish_plugin"; }
-  int getNbOutputs() const override { return 1; }
-  int initialize() override { return 0; }
+  const char* getPluginType() const TRT_NOEXCEPT override { return "hard_swish_plugin"; }
+  int getNbOutputs() const TRT_NOEXCEPT override { return 1; }
+  int initialize() TRT_NOEXCEPT override { return 0; }
   nvinfer1::Dims getOutputDimensions(int index, const nvinfer1::Dims* inputs,
-                                     int nbInputDims) override;
-  int enqueue(int batchSize, const void* const* inputs, void** outputs,
-              void* workspace, cudaStream_t stream) override;
+                                     int nbInputDims) TRT_NOEXCEPT override;
+#if IS_TRT_VERSION_LT(8000)
+  int enqueue(int batchSize, const void* const* inputs, void **outputs,
+#else
+  int enqueue(int batchSize, const void* const* inputs, void *const *outputs,
+#endif
+              void* workspace, cudaStream_t stream) TRT_NOEXCEPT override;
 
- protected:
-  float threshold_;
-  float scale_;
-  float offset_;
-
-  size_t getSerializationSize() override {
+  size_t getSerializationSize() const TRT_NOEXCEPT override {
     return getBaseSerializationSize() + SerializedSize(threshold_) +
            SerializedSize(scale_) + SerializedSize(offset_) +
            SerializedSize(getPluginType());
@@ -65,13 +64,18 @@ class HardSwishPlugin : public PluginTensorRT {
 
   // TRT will call this func  to serialize the configuration of TRT
   // It should not be called by users.
-  void serialize(void* buffer) override {
+  void serialize(void* buffer) const TRT_NOEXCEPT override {
     SerializeValue(&buffer, getPluginType());
     serializeBase(buffer);
     SerializeValue(&buffer, threshold_);
     SerializeValue(&buffer, scale_);
     SerializeValue(&buffer, offset_);
   }
+
+ protected:
+  float threshold_;
+  float scale_;
+  float offset_;
 };
 
 }  // namespace plugin
