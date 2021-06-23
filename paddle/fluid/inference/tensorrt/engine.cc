@@ -234,6 +234,7 @@ void TensorRTEngine::FreezeNetwork() {
     }
     infer_builder_config_->addOptimizationProfile(optim_profile_);
     infer_builder_config_->setMaxWorkspaceSize(max_workspace_);
+    infer_builder_config_->setFlag(nvinfer1::BuilderFlag::kSPARSE_WEIGHTS);
     if (enable_int8) {
       // Due to a bug of TRT, we must set precision BuilderFlag to kFP16 before
       // kINT8 here to perform INT8 inference.
@@ -258,7 +259,8 @@ void TensorRTEngine::FreezeNetwork() {
 #if IS_TRT_VERSION_LT(8000)
     infer_engine_.reset(infer_builder_->buildCudaEngine(*network()));
 #else
-    infer_engine_.reset(infer_builder_->buildEngineWithConfig(*network(), *infer_builder_config_));
+    infer_engine_.reset(infer_builder_->buildEngineWithConfig(
+        *network(), *infer_builder_config_));
 #endif
   }
   PADDLE_ENFORCE_NOT_NULL(
